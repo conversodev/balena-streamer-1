@@ -12,10 +12,3 @@ services:
         - '35173' # Chromium debugging port (optional)
     volumes:
       - 'settings:/data' # Only required if using PERSISTENT flag (see below)
-  audio:
-    image: bh.cr/balenalabs/audio-aarch64
-    privileged: true
-    ports:
-      - 4317:4317
-    environment:
-      AUDIO_OUTPUT: RPI_HEADPHONES
