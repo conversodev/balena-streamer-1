@@ -1,24 +1,57 @@
-# base-image for node on any machine using a template variable,
-# see more about dockerfile templates here: https://www.balena.io/docs/learn/develop/dockerfile/#dockerfile-templates
-# and about balena base images here: https://www.balena.io/docs/reference/base-images/base-images/
-FROM balenalib/%%BALENA_ARCH%%-node:14-buster-run
+ARG NODEJS_VERSION="16.19.1"
 
-# use `install_packages` if you need to install dependencies,
-# for instance if you need git, just uncomment the line below.
-# RUN install_packages git
+FROM balenalib/%%BALENA_MACHINE_NAME%%-debian-node:${NODEJS_VERSION}-bullseye-run
 
-# Defines our working directory in container
+# install required packages
+RUN install_packages \
+    chromium-common \
+    chromium \
+    libgles2-mesa \
+    lsb-release \
+    mesa-vdpau-drivers \
+    scrot \
+    x11-xserver-utils \
+    xserver-xorg-input-evdev \
+    xserver-xorg-legacy \
+    xserver-xorg-video-fbdev \
+    xserver-xorg xinit \
+    xinput \
+    xterm 
+
 WORKDIR /usr/src/app
 
-# Copies the package.json first for better cache on later pushes
-COPY package*.json ./
+# install node dependencies
+COPY ./package.json /usr/src/app/package.json
+RUN JOBS=MAX npm install --unsafe-perm --production && npm cache clean --force
 
-# This install npm dependencies on the balena build server,
-# making sure to clean up the artifacts it creates in order to reduce the image size.
-RUN JOBS=MAX npm install --production --unsafe-perm && npm cache verify && rm -rf /tmp/*
+COPY ./src /usr/src/app/
 
-# This will copy all files in our root to the working directory in the container
-COPY . ./
+RUN chmod +x ./*.sh
 
-# server.js will run when container starts up on the device
-CMD ["npm", "start"]
+ENV UDEV=1
+
+RUN mkdir -p /etc/chromium/policies
+RUN mkdir -p /etc/chromium/policies/recommended
+COPY ./policy.json /etc/chromium/policies/recommended/my_policy.json
+
+# Add chromium user
+RUN useradd chromium -m -s /bin/bash -G root || true && \
+    groupadd -r -f chromium && id -u chromium || true \
+    && chown -R chromium:chromium /home/chromium || true
+
+COPY ./public-html /home/chromium  
+
+# udev rule to set specific permissions 
+RUN echo 'SUBSYSTEM=="vchiq",GROUP="video",MODE="0660"' > /etc/udev/rules.d/10-vchiq-permissions.rules
+RUN usermod -a -G audio,video,tty chromium
+
+RUN ln -s /usr/bin/chromium /usr/bin/chromium-browser || true
+
+# Set up the audio block. This won't have any effect if the audio block is not being used.
+RUN curl -skL https://raw.githubusercontent.com/balena-labs-projects/audio/master/scripts/alsa-bridge/debian-setup.sh| sh
+ENV PULSE_SERVER=tcp:audio:4317
+
+COPY VERSION .
+
+# Start app
+CMD ["bash", "/usr/src/app/start.sh"]

@@ -1,11 +1,4 @@
-# Temporary files.
-.#*
-
-# Log files.
-*.log
-
-# Don't push node_modules - we want the build server to install these.
-node_modules/
-
-#OSX hidden metadata file
-.DS_Store
+sha256bca9ad158da383a9af76908776cf6cd8b06359a8a1529c4862fd17fd3f2fc7b3
+Dockerfile.raspberrypi3
+Dockerfile.raspberrypi4-64
+/balena-cli
